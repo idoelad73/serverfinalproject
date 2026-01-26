@@ -46,7 +46,7 @@ connectDB();
 // loadEmailAccounts(); // ✅ run once at startup
 // Middleware
 app.use(cors({
-    origin: ["http://localhost:5173","http://localhost:5174"],
+    origin: ["http://localhost:5173","http://localhost:5174","https://idoeladclient.onrender.com","https://idofinalprojectdhshboard.onrender.com"],
     credentials: true,
   }));
   
