@@ -20,121 +20,139 @@ const oauth2Client = new OAuth2Client(
 console.log('google client id',process.env.GOOGLE_CLIENT_ID,)
 export default {
 
-    createUser: async (req, res) => {
-        try {
-            const { user_email } = req.body;
+  
 
-            if (!user_email) {
-                return res.status(400).json({ success: false, message: "Email is required" });
-            }
+createUser: async (req, res) => {
+  try {
+    const { user_email } = req.body;
 
-            // 1️⃣ Check if user exists
-            const existingUser = await usersModel.findOne({ user_email });
+    if (!user_email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
 
-            if (existingUser) {
-                return res.status(409).json({
-                    success: false,
-                    message: "User already exists"
-                });
-            }
+    const existingUser = await usersModel.findOne({ user_email });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: "User already exists" });
+    }
 
-            // 2️⃣ Create verification token
-            const verificationToken = crypto.randomBytes(32).toString("hex");
-            req.body.user_email_verification_token = verificationToken;
-            req.body.user_email_verification_token_expires_at = Date.now() + 1000 * 60 * 60;
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
-            // 3️⃣ Create user
-            const user = await usersModel.create(req.body);
+    const user = await usersModel.create({
+      ...req.body,
+      user_email_verification_token: verificationToken,
+      user_email_verification_token_expires_at: Date.now() + 1000 * 60 * 60,
+      user_email_verified: false
+    });
 
-            // 4️⃣ Verification URL
-            const verificationUrl = `${req.protocol}://${req.get('host')}/ido_shop_api/auth/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${req.protocol}://${req.get("host")}/ido_shop_api/auth/verify-email?token=${verificationToken}`;
+    await emailValidationTemplate(user, verificationUrl);
 
-            await emailValidationTemplate(user, verificationUrl);
+    // ✅ ADD: create JWT
+    const token = jwt.sign(
+      { id: user._id, user_role: user.user_role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
 
-            return res.status(201).json({
-                success: true,
-                message: "User registered successfully",
-                userId: user._id,
-                user
-            });
+    // ✅ SEND TOKEN IN JSON (for localStorage)
+    return res.status(201).json({
+      success: true,
+      token,
+      user: {
+        _id: user._id,
+        user_name: user.user_name,
+        user_email: user.user_email,
+        user_role: user.user_role
+      }
+    });
 
-        } catch (error) {
-            console.error(error);
+  } catch (error) {
+    console.error(error);
 
-            if (error.code === 11000) {
-                return res.status(409).json({
-                    success: false,
-                    message: "User already exists"
-                });
-            }
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: "User already exists" });
+    }
 
-            res.status(500).json({
-                success: false,
-                message: "Server error",
-                error: error.message
-            });
-        }
-    },
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+},
+
 
 
     loginUser: async (req, res) => {
         try {
-            const { user_email, user_password } = req.body;
-            const user = await usersModel.findOne({ user_email });
-
-            if (!user) {
-                throw new Error('User not found');
+          const { user_email, user_password } = req.body;
+      
+          const user = await usersModel.findOne({ user_email });
+          if (!user) {
+            return res.status(404).json({ message: "User not found" });
+          }
+      
+          if (!user.user_email_verified) {
+            return res.status(403).json({ message: "Email not verified" });
+          }
+      
+          const isPasswordCorrect = await user.comparePassword(user_password);
+          if (!isPasswordCorrect) {
+            return res.status(401).json({ message: "Invalid password" });
+          }
+      
+          if (!process.env.JWT_SECRET) {
+            return res.status(500).json({ message: "JWT_SECRET not configured" });
+          }
+      
+          const token = jwt.sign(
+            { id: user._id, user_role: user.user_role },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+          );
+      
+          res.cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "strict",
+            maxAge: 1000 * 60 * 60
+          });
+      
+          console.log("user submitted ok!!!!");
+      
+          // 🚨 SEND RESPONSE ONCE AND EXIT
+          return res.status(200).json({
+            token,
+            user: {
+              _id: user._id,
+              user_name: user.user_name,
+              user_email: user.user_email,
+              user_role: user.user_role
             }
-            if (user.user_email_verified === false) {
-                throw new Error('Email not verified');
-            }
-            const isPasswordCorrect = await user.comparePassword(user_password);
-            if (!isPasswordCorrect) {
-                throw new Error('Invalid password');
-            }
-
-            // Check if JWT_SECRET is configured
-            if (!process.env.JWT_SECRET) {
-                throw new Error('JWT_SECRET is not configured. Please set it in your .env file.');
-            }
-
-            // Payload, signature, options
-            const token = jwt.sign({ id: user._id, user_role: user.user_role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-            res.cookie("token", token, { httpOnly: true, secure: true, maxAge: 1000 * 60 * 60 * 24 * 30 });
-            res.status(200).json(user);
-            console.log('user summbited ok!!!!')
+          });
+      
         } catch (error) {
-            console.log(error);
-            if (error.message === 'All fields are required') {
-                return res.status(400).json({ message: error.message });
-            }
-            if (error.message === 'User not found') {
-                return res.status(404).json({ message: error.message });
-            }
-            res.status(500).json({ message: error.message });
+          console.error(error);
+      
+          // ⛔ prevent double response
+          if (res.headersSent) return;
+      
+          return res.status(500).json({ message: error.message });
         }
-    },
-    getUser: async (req, res) => {
+      },
+      
+      logoutUser: async (req, res) => {
         try {
-            const user = await usersModel.findById(req.user.id);
-
-            res.status(200).json({ message: 'User verified successfully', user });
+          // Clear the cookie
+          res.clearCookie("token", { httpOnly: true, secure: true });
+      
+          // ✅ Send response (frontend will remove localStorage token)
+          return res.status(200).json({
+            message: "User logged out successfully",
+            success: true
+          });
         } catch (error) {
-            console.log(error);
-            res.status(500).json({ message: error.message });
+          console.error(error);
+          return res.status(500).json({ message: error.message, success: false });
         }
-    },
-    logoutUser: async (req, res) => {
-        try {
-            res.clearCookie("token",
-                { httpOnly: true, secure: true }
-            );
-            res.status(200).json({ message: 'User logged out successfully' });
-        } catch (error) {
-            console.log(error);
-            res.status(500).json({ message: error.message });
-        }
-    },
+      },
+      
     validateEmail: async (req, res) => {
         try {
             const { token } = req.query;
@@ -204,7 +222,7 @@ export default {
         }
     },
     googleLogin: async (req, res) => {
-        console.log('googleLogin hit')
+        console.log("googleLogin hit");
         try {
           const { code } = req.body;
       
@@ -212,7 +230,8 @@ export default {
             code,
             redirect_uri: process.env.GOOGLE_REDIRECT_URI,
           });
-            console.log('token',tokens)
+          console.log("token", tokens);
+      
           const ticket = await oauth2Client.verifyIdToken({
             idToken: tokens.id_token,
             audience: process.env.GOOGLE_CLIENT_ID,
@@ -235,13 +254,31 @@ export default {
             });
           }
       
-          res.status(200).json({ success: true, user });
+          // ✅ CREATE JWT for frontend
+          const token = jwt.sign(
+            { id: user._id, user_role: user.user_role },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+          );
+      
+          // ✅ SEND TOKEN + SAFE USER DATA
+          return res.status(200).json({
+            success: true,
+            token,
+            user: {
+              _id: user._id,
+              user_name: user.user_name,
+              user_email: user.user_email,
+              user_role: user.user_role,
+            },
+          });
       
         } catch (err) {
           console.error("❌ Google login error:", err.response?.data || err.message);
-          res.status(500).json({ success: false });
+          return res.status(500).json({ success: false });
         }
       },
+      
       
       
     authMe: async (req, res) => {
