@@ -153,28 +153,37 @@ createUser: async (req, res) => {
         }
       },
       
-    validateEmail: async (req, res) => {
+      validateEmail: async (req, res) => {
         try {
-            const { token } = req.query;
-            const user = await usersModel.findOne({ user_email_verification_token: token });
-            if (!user) {
-                throw new Error('Invalid token');
-            }
-            if (user.user_email_verification_token_expires_at < Date.now()) {
-                throw new Error('Token expired');
-            }
-
-            user.user_email_verified = true;
-            user.user_email_verification_token = null;
-            user.user_email_verification_token_expires_at = null;
-
-            await user.save();
-            res.status(200).sendFile(path.join(process.cwd(), 'public', 'index.html'));
+          const { token } = req.query;
+      
+          const user = await usersModel.findOne({
+            user_email_verification_token: token
+          });
+      
+          if (!user) {
+            return res.status(400).send("Invalid token");
+          }
+      
+          if (user.user_email_verification_token_expires_at < Date.now()) {
+            return res.status(400).send("Token expired");
+          }
+      
+          user.user_email_verified = true;
+          user.user_email_verification_token = null;
+          user.user_email_verification_token_expires_at = null;
+      
+          await user.save();
+      
+          // ✅ redirect to frontend
+          res.redirect(process.env.FRONT_URL);
+      
         } catch (error) {
-            console.log(error);
-            res.status(500).json({ message: error.message });
+          console.error(error);
+          res.status(500).send("Email verification failed");
         }
-    },
+      },
+      
     forgotPassword: async (req, res) => {
         try {
             const { user_email } = req.body;
