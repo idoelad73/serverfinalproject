@@ -44,7 +44,7 @@ createUser: async (req, res) => {
       user_email_verified: false
     });
 
-    const verificationUrl = `${req.protocol}://${req.get("host")}/ido_shop_api/auth/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${process.env.SERVER_URL}/ido_shop_api/auth/verify-email?token=${verificationToken}`;
     await emailValidationTemplate(user, verificationUrl);
 
     // ✅ ADD: create JWT
