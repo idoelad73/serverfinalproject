@@ -176,7 +176,8 @@ createUser: async (req, res) => {
           await user.save();
       
           // ✅ redirect to frontend
-          res.redirect(`${process.env.FRONT_URL}/login`);
+          res.redirect(`${process.env.FRONT_URL}/?go=login`);
+
 
       
         } catch (error) {
