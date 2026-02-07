@@ -202,8 +202,12 @@ export default {
 
             if (req.file) {
                 try {
-                    const result = await cloudinary.uploader.upload(req.file.path);
-
+                    const result = await cloudinary.uploader.upload(req.file.path, {
+                        folder: "products"
+                      });
+                      
+                      product.image = result.secure_url;
+                      
 
                     productData.images = result.secure_url;
 
@@ -335,7 +339,12 @@ export default {
             // ✅ Handle image upload
             if (req.file) {
                 try {
-                    const result = await cloudinary.uploader.upload(req.file.path);
+                    const result = await cloudinary.uploader.upload(req.file.path, {
+                        folder: "products"
+                      });
+                      
+                      product.image = result.secure_url;
+                      
 
 
                     updateData.images = result.secure_url; // ✅ string, NOT array
