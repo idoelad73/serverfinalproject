@@ -206,7 +206,7 @@ export default {
                         folder: "products"
                       });
                       
-                      product.image = result.secure_url;
+                    //   product.image = result.secure_url;
                       
 
                     productData.images = result.secure_url;
@@ -343,7 +343,7 @@ export default {
                         folder: "products"
                       });
                       
-                      product.image = result.secure_url;
+                    //   product.image = result.secure_url;
                       
 
 
