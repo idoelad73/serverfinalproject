@@ -88,3 +88,4 @@ importProducts()
         console.error('❌ Import process failed:', error);
         process.exit(1);
     });
+export default importProducts

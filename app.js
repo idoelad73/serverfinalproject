@@ -19,6 +19,8 @@ import orderRouter from './routers/order.router.js';
 import paymentRouter from './routers/payment.router.js';
 import supportRouter from './routers/support.router.js'
 
+// import importProducts from "./util/importdata.js";
+
 
 
 // import { loadEmailAccounts } from './util/emailAccounts.js'
@@ -46,7 +48,7 @@ connectDB();
 // loadEmailAccounts(); // ✅ run once at startup
 // Middleware
 app.use(cors({
-    origin: ["http://localhost:5173","http://localhost:5174","https://idoeladclient.onrender.com","https://idofinalprojectdhshboard.onrender.com"],
+    origin: ["http://localhost:5173","http://localhost:5174","http://localhost:5175","https://idoeladclient.onrender.com","https://idofinalprojectdhshboard.onrender.com"],
     credentials: true,
   }));
   
@@ -59,6 +61,7 @@ console.log("GOOGLE_REDIRECT_URI:", process.env.GOOGLE_REDIRECT_URI);
  
  app.use(express.json());
  app.use(express.urlencoded({ extended: true }));
+//  importProducts();
 
 // API Routes
 app.use('/ido_shop_api/auth', authenticationRouter);
